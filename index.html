@@ -1,0 +1,326 @@
+<html>
+<head>
+<script src="lib/jquery/jquery-1.11.3.js" charset="utf-8"></script>
+<script src="lib/d3/d3.js" charset="utf-8"></script>
+<script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="src/plotIntervals.js" charset="utf-8"></script>
+<script src="src/parseData.js" charset="utf-8"></script>
+<link rel="stylesheet" href="lib/bootstrap/css/bootstrap.css" />
+<style type="text/css">
+	html, body {
+		margin:0;
+		padding:0;
+	}
+	body {
+		background: url('img/greybg.jpg')
+	}
+	#input-panel {
+		width: 100%;
+		height: 0;
+		background-color: orange;
+	}
+	#message-panel {
+		border-bottom: 1px solid grey;
+		padding-top: 25;
+		padding-bottom: 15;
+		background-color: #9A6D31;
+		font-size: 20;
+		color: #3C322A;
+	}
+	#message-panel .error {
+		color: #D9A63E;
+		display: none;
+	}
+	#input-form {
+		display: none;
+	}
+	#modal {
+		display: none;
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		opacity: 0.6;
+		background-color: black;
+	}
+	#flash {
+		display: none;
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		opacity: 0.9;
+		background-color: white;
+	}
+	.output {
+	}
+	.canvas {
+	}
+	.axis-line {
+	}
+	.tick-line {
+	}
+	.interval-bound {
+	}
+	.interval-bound-close {
+	}
+	.interval-bound-open {
+	}
+	.interval-line {
+	}
+</style>
+</head>
+<body>
+<div id="input-panel">
+<div id="input-form">
+<div class="container">
+<div class="row">
+<div class="col-md-10 col-md-offset-2"><h1>Enter set intervals</h1></div>
+<form class="form-horizontal" role="form" onsubmit="false">
+  <div class="form-group">
+    <label class="control-label col-md-2" for="set-a">Set \(A\):</label>
+    <div class="col-md-10">
+      <input type="text" class="form-control input-list" id="set-a" placeholder="Example: (-infty, -3], (-3,-2) ,[1,infty)">
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="control-label col-md-2" for="set-b">Set \(B\):</label>
+    <div class="col-md-10"> 
+      <input type="text" class="form-control input-list" id="set-b" placeholder="Example: (-infty, -3], (-3,-2) ,[1,infty)">
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="control-label col-md-2" for="set-c">Set \(C\):</label>
+    <div class="col-md-10"> 
+      <input type="text" class="form-control input-list" id="set-c" placeholder="Example: (-infty, -3], (-3,-2) ,[1,infty)">
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="control-label col-md-2" for="set-d">Set \(D\):</label>
+    <div class="col-md-10"> 
+      <input type="text" class="form-control input-list" id="set-d" placeholder="Example: (-infty, -3], (-3,-2) ,[1,infty)">
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="control-label col-md-2" for="set-e">Set \(E\):</label>
+    <div class="col-md-10"> 
+      <input type="text" class="form-control input-list" id="set-e" placeholder="Example: (-infty, -3], (-3,-2) ,[1,infty)">
+    </div>
+  </div>
+  <div class="form-group"> 
+    <div class="col-md-offset-2 col-md-10">
+      <button type="submit" id="plot-button" class="btn btn-default">PLOT</button>
+      <button id="cancel-button" class="btn btn-default">CANCEL</button>
+    </div>
+  </div>
+</form>
+</div></div></div>
+</div>
+<div id="message-panel">
+<div class="container">
+<div class="row">
+<div class="col-md-12">
+<div class="text-center">
+<p class="tex"></p>
+<p class="error"></p>
+</div></div></div></div></div>
+<div id="modal"></div>
+<div id="flash"></div>
+<div id="output-panel">
+
+</div>
+<script type="text/javascript">
+var controller = {
+		inputPanel: $("#input-panel"),
+		plotButton: $("#plot-button"),
+		cancelButton: $("#cancel-button"),
+		inputForm: $("#input-form"),
+		inputList: $("#input-form .input-list"),
+		outputPanel: $("#output-panel"),
+		messagePanel: $("#message-panel"),
+		modal: $("#modal"),
+		flash: $("#flash"),
+		
+		inputPanelHideHeight: 0,
+		inputPanelShowHeight: 400,
+		
+		init: function() {
+			var self = this;
+			self.inputPanel
+				.css({
+					width: "100%",
+					height: self.inputPanelHideHeight,
+					"background-color": "orange"
+				})
+				.click(function() {
+					self.showInputPanel(500);
+				})
+				.data("show", false);
+			
+			self.inputForm
+				.hide(0)
+				.data("show", false);
+			
+			self.plotButton
+				.click(function(e) {
+					e.preventDefault();
+					var plotSuccess = false;
+					self.hideInputPanel(500, function() {
+						if (plotSuccess) self.blink(1000);
+					});
+					try {
+						var rawInputs = self.getRawInputs();
+						self.setMathLabel(rawInputs);
+						self.plot(rawInputs);
+						plotSuccess = true;
+					} catch(e) {
+						self.setMessage(e, "error");
+					}
+					return false;
+				});
+			self.cancelButton
+				.click(function(e) {
+					e.preventDefault();
+					self.hideInputPanel(500);
+				});
+			
+			self.setInputs([
+				"(-infty, -3),(-3,-2),(-2,2],[3,infty)",
+				"(2,infty)",
+				"[3, infty)"
+			]);
+			
+			self.messagePanel
+				.click(function() {
+					if (self.inputPanel.data("show")) {
+						self.hideInputPanel(500);
+					} else {
+						self.showInputPanel(500);
+					}
+				});
+			
+			try {
+				var rawInputs = self.getRawInputs();
+				self.setMathLabel(rawInputs);
+				self.plot(rawInputs);
+			} catch(e) {
+				self.setMessage(e, "error");
+			}
+			
+			return self;
+		},
+		
+		getRawInputs: function() {
+			var self = this;
+			var fixedSetNames = ["A", "B", "C", "D", "E"];
+			return self.inputList.map(function(i, d) {
+				return {name: fixedSetNames[i], intervals: d.value}
+			}).filter(function(i, d) {
+				return d.intervals && d.intervals.length != 0;
+			}).get();
+		},
+		plot: function(rawInputs) {
+			var self = this;
+			if (rawInputs.length > 0) {
+				var plotData = ReallyPlot.parseData(rawInputs);
+				self.outputPanel.empty();
+				ReallyPlot.plotIntervals(this.outputPanel.get(0), plotData, {
+					canvasWidth: $(window).width(),
+					canvasHeight: $(window).height() - 100
+				});
+			}
+		},
+		
+		showInputPanel: function(duration) {
+			var self = this;
+			
+			if (!self.inputPanel.data("show")) {
+				self.inputPanel
+					.animate({
+						height: self.inputPanelShowHeight
+					}, duration, function() {
+						self.inputPanel.data("show", true);
+					});
+			}
+			
+			self.showInputForm(duration);
+
+		},
+		hideInputPanel: function(duration, callback) {
+			var self = this;
+			self.hideInputForm(duration);
+			if (self.inputPanel.data("show")) {
+				self.inputPanel
+					.animate({
+						height: self.inputPanelHideHeight
+					}, duration, function() {
+						self.inputPanel.data("show", false);
+						if (callback) callback();
+					});
+			}
+			
+		},
+		
+		setMessage: function(msg, clz) {
+			var self = this;
+			self.messagePanel.find("p").hide();
+			self.messagePanel.find("p."+clz).text(msg).show();
+			self.messagePanel.css("font-size", 20 - (0.03*msg.length));
+		},
+		
+		setMathLabel: function(rawInputs) {
+			var self = this;
+			var tex = rawInputs.map(function(d, i) {
+				return d.intervals.replace(/ *, *(?=[\[\()])/g	, "\\cup").replace(/infty/g, "\\infty");
+			}).join("\\ \\ \\ , \\ \\ \\ ");
+			self.setMessage("\\(" + tex + "\\)", "tex");
+			MathJax.Hub.queue.Push(function() {
+				MathJax.Hub.Typeset(self.messagePanel.get(0));
+			});
+
+		},
+		
+		showInputForm: function(duration) {
+			var self = this;
+			if (!self.inputForm.data("show")) {
+				self.showModal(duration);	
+				self.inputForm.show(duration, function() {
+					self.inputForm.data("show", true);
+				});
+			}
+			
+		},
+		hideInputForm: function(duration) {
+			var self = this;
+			if (self.inputForm.data("show")) {
+				self.hideModal(duration);
+				self.inputForm.hide(duration, function() {
+					self.inputForm.data("show", false);
+				});
+			}
+		},
+		setInputs: function(inputs) {
+			var self = this;
+			inputs.forEach(function(input, i) {
+				self.inputList.get(i).value = input;
+			});
+		},
+		
+		showModal: function(duration) {
+			var self = this;
+			self.modal.fadeIn(duration);
+		},
+		hideModal: function(duration) {
+			var self = this;
+			self.modal.fadeOut(duration);
+		},
+		
+		blink: function(duration) {
+			var self = this;
+			self.flash.fadeIn(duration/4).fadeOut(duration/4).fadeIn(duration/4).fadeOut(duration/4);
+		}
+};
+$(function() {
+	controller.init();
+})
+</script>
+</body>
+</html>
