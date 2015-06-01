@@ -42,7 +42,11 @@ ReallyPlot.plotIntervals = function (parent, data, config) {
 
 	var coordinate = canvas.append("g")
 		.attr("class", "coordinate")
-		.attr("transform", "scale(1,-1) translate(0," + (-canvas.attr("height") + 0.5*(config.canvasHeight-config.scaleY(data.levelName.length+1))) + ")");
+		.attr("transform", function() {
+			var adjust = 0.5*(config.canvasHeight-config.scaleY(data.levelName.length+1));
+			adjust = (adjust > 0) ? adjust : 0;
+			return "scale(1,-1) translate(0," + (-canvas.attr("height") + adjust) + ")";
+		});
 	
 	var axisLine = coordinate
 		.append("line")

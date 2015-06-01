@@ -9,7 +9,7 @@ ReallyPlot.parseData = function(rawData) {
 		init: function() {
 			this.infty = findInfty(rawData);
 			this.intervals = parseIntervals(rawData, this.infty);
-			this.ticks = determineTicks(this.intervals, this.inf);
+			this.ticks = determineTicks(this.intervals, this.infty);
 			return this;
 		}
 	}.init();
